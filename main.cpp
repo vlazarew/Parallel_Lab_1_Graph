@@ -4,6 +4,74 @@ using namespace std;
 #include <time.h>
 #include <vector>
 
+void handleNode(NodeOfGraph* node, int countOfColumns, int countOfRows, int nodesToThroughLink, vector<NodeOfGraph>* resultGraph, int i, int connectNodes, int k1, int k2)
+{
+    int nodeIndexOfColumn = node->getIndexOfColumn();
+    int nodeIndexOfRow = node->getIndexOfRow();
+
+    bool throughLink = false;
+
+    bool rightNodeExist = (nodeIndexOfColumn < countOfColumns - 1);
+    bool leftNodeExist = (nodeIndexOfColumn > 0);
+    bool downNodeExist = (nodeIndexOfRow < countOfRows - 1);
+    bool upNodeExist = (nodeIndexOfRow > 0);
+
+    if (nodesToThroughLink > 0 && rightNodeExist && downNodeExist) {
+        nodesToThroughLink--;
+    } else {
+        throughLink = rightNodeExist && downNodeExist;
+    }
+
+    vector<NodeOfGraph>* nodesNeighbors = &node->getNeightbors();
+
+    // Добавляем верхнюю вершину в соседи
+    if (upNodeExist) {
+        NodeOfGraph* neededNode = &resultGraph->at(i - countOfColumns);
+        nodesNeighbors->push_back(*neededNode);
+    }
+
+    // Добавляем левую вершину в соседи
+    if (leftNodeExist) {
+        NodeOfGraph* neededNode = &resultGraph->at(i - 1);
+        nodesNeighbors->push_back(*neededNode);
+    }
+
+    // Добавляем текущую вершину в соседи
+    nodesNeighbors->push_back(*node);
+
+    // Добавляем правую вершину в соседи
+    if (rightNodeExist) {
+        NodeOfGraph* neededNode = &resultGraph->at(i + 1);
+        nodesNeighbors->push_back(*neededNode);
+    }
+
+    // Добавляем нижнюю вершину в соседи
+    if (downNodeExist) {
+        NodeOfGraph* neededNode = &resultGraph->at(i + countOfColumns);
+        nodesNeighbors->push_back(*neededNode);
+    }
+
+    // Добавление боковых
+    if (throughLink) {
+        NodeOfGraph* throwingNode = &resultGraph->at(i + countOfColumns + 1);
+        nodesNeighbors->push_back(*throwingNode);
+
+        vector<NodeOfGraph> throwingNodeNeighbors = throwingNode->getNeightbors();
+        throwingNodeNeighbors.push_back(*node);
+        throwingNode->setNeighbors(throwingNodeNeighbors);
+        resultGraph->at(throwingNode->getID()) = *throwingNode;
+
+        // Сколько узлов еще надо соединить
+        connectNodes--;
+        if (connectNodes == 0) {
+            nodesToThroughLink = k1;
+            connectNodes = k2;
+        }
+    }
+
+    node->setNeighbors(*nodesNeighbors);
+}
+
 void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* resultGraph)
 {
     // Поскольку узлы
@@ -24,76 +92,11 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
 
     int sizeOfResultGraph = resultGraph->size();
     for (int i = 0; i < sizeOfResultGraph; i++) {
-        NodeOfGraph* node = &resultGraph->at(i);
-
-        int nodeIndexOfColumn = node->getIndexOfColumn();
-        int nodeIndexOfRow = node->getIndexOfRow();
-
-        bool throughLink = false;
-
-        bool rightNodeExist = (nodeIndexOfColumn < countOfColumns - 1);
-        bool leftNodeExist = (nodeIndexOfColumn > 0);
-        bool downNodeExist = (nodeIndexOfRow < countOfRows - 1);
-        bool upNodeExist = (nodeIndexOfRow > 0);
-
-        if (nodesToThroughLink > 0 && rightNodeExist && downNodeExist) {
-            nodesToThroughLink--;
-        } else {
-            throughLink = rightNodeExist && downNodeExist;
-        }
-
-        vector<NodeOfGraph> nodesNeighbors = node->getNeightbors();
-
-        // Добавляем верхнюю вершину в соседи
-        if (upNodeExist) {
-            NodeOfGraph* neededNode = &resultGraph->at(i - countOfColumns);
-            nodesNeighbors.push_back(*neededNode);
-        }
-
-        // Добавляем левую вершину в соседи
-        if (leftNodeExist) {
-            NodeOfGraph* neededNode = &resultGraph->at(i - 1);
-            nodesNeighbors.push_back(*neededNode);
-        }
-
-        // Добавляем текущую вершину в соседи
-        nodesNeighbors.push_back(*node);
-
-        // Добавляем правую вершину в соседи
-        if (rightNodeExist) {
-            NodeOfGraph* neededNode = &resultGraph->at(i + 1);
-            nodesNeighbors.push_back(*neededNode);
-        }
-
-        // Добавляем нижнюю вершину в соседи
-        if (downNodeExist) {
-            NodeOfGraph* neededNode = &resultGraph->at(i + countOfColumns);
-            nodesNeighbors.push_back(*neededNode);
-        }
-
-        // Добавление боковых
-        if (throughLink) {
-            NodeOfGraph* throwingNode = &resultGraph->at(i + countOfColumns + 1);
-            nodesNeighbors.push_back(*throwingNode);
-
-            vector<NodeOfGraph> throwingNodeNeighbors = throwingNode->getNeightbors();
-            throwingNodeNeighbors.push_back(*node);
-            throwingNode->setNeighbors(throwingNodeNeighbors);
-            resultGraph->at(throwingNode->getID()) = *throwingNode;
-
-            // Сколько узлов еще надо соединить
-            connectNodes--;
-            if (connectNodes == 0) {
-                nodesToThroughLink = k1;
-                connectNodes = k2;
-            }
-        }
-
-        node->setNeighbors(nodesNeighbors);
-        resultGraph->at(i) = *node;
+        NodeOfGraph node = resultGraph->at(i);
+        handleNode(&node, countOfColumns, countOfRows, nodesToThroughLink, resultGraph, i, connectNodes, k1, k2);
+        resultGraph->at(i) = node;
     }
 
-    //return resultGraph;
 }
 
 int main(int argc, char* argv[])
@@ -125,7 +128,6 @@ int main(int argc, char* argv[])
         isPrint = (arguments[4] == 1) ? true : false;
     }
 
-    //Portrait portrait = createPortrait(Nx, Ny, k1, k2);
     vector<NodeOfGraph> resultGraph;
     createNodesOfGraph(Nx, Ny, k1, k2, &resultGraph);
 

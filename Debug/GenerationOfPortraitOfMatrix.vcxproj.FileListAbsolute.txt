@@ -1,2 +1,4 @@
 D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\GenerationOfPortraitOfMatrix\Debug\GenerationOfPortraitOfMatrix.exe
 D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\GenerationOfPortraitOfMatrix\Debug\GenerationOfPortraitOfMatrix.pdb
+D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\Parallel_Lab_1_Graph\Debug\GenerationOfPortraitOfMatrix.exe
+D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\Parallel_Lab_1_Graph\Debug\GenerationOfPortraitOfMatrix.pdb

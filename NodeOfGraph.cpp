@@ -28,14 +28,14 @@ string createJA(vector<NodeOfGraph> *graph)
         NodeOfGraph node = graph->at(j);
         bool lastNode = (j == graph->size() - 1);
 
-        vector<NodeOfGraph> neighbors = node.getNeightbors();
+        vector<int> neighbors = node.getNeightbors();
         for (int i = 0; i < neighbors.size(); i++) {
-            NodeOfGraph neighbor = neighbors[i];
+            int neighborID = neighbors[i];
 
             if ((i == neighbors.size() - 1) && lastNode) {
-                result += to_string(neighbor.getID());
+                result += to_string(neighborID);
             } else {
-                result += to_string(neighbor.getID()) + ", ";
+                result += to_string(neighborID) + ", ";
             }
         }
     }
@@ -51,14 +51,14 @@ vector<string> createAdjacencyList(vector<NodeOfGraph> *graph)
         stringstream resultString;
         resultString << "[" << node.getID() << "] –> {";
 
-        vector<NodeOfGraph> neighbors = node.getNeightbors();
+        vector<int> neighbors = node.getNeightbors();
         for (int i = 0; i < neighbors.size(); i++) {
-            NodeOfGraph neighbor = neighbors[i];
+            int neighborID = neighbors[i];
 
             if (i == neighbors.size() - 1) {
-                resultString << neighbor.getID();
+                resultString << to_string(neighborID);
             } else {
-                resultString << neighbor.getID() << ", ";
+                resultString << to_string(neighborID) << ", ";
             }
         }
 

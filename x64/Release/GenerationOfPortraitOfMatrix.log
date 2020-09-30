@@ -1,0 +1,9 @@
+﻿  main.cpp
+D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\Parallel_Lab_1_Graph\main.cpp(25,48): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
+  NodeOfGraph.cpp
+D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\Parallel_Lab_1_Graph\NodeOfGraph.cpp(16,52): warning C4267: +=: преобразование из "size_t" в "int"; возможна потеря данных
+  Создание кода
+  Previous IPDB not found, fall back to full compilation.
+  All 323 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Создание кода завершено
+  GenerationOfPortraitOfMatrix.vcxproj -> D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\Parallel_Lab_1_Graph\x64\Release\GenerationOfPortraitOfMatrix.exe

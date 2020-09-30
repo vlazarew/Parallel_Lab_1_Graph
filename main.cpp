@@ -42,42 +42,42 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
             throughLink = rightNodeExist && downNodeExist;
         }
 
-        vector<NodeOfGraph> nodesNeighbors = node->getNeightbors();
+        vector<int> nodesNeighbors = node->getNeightbors();
 
         // Добавляем верхнюю вершину в соседи
         if (upNodeExist) {
             NodeOfGraph* neededNode = &resultGraph->at(i - countOfColumns);
-            nodesNeighbors.push_back(*neededNode);
+            nodesNeighbors.push_back(neededNode->getID());
         }
 
         // Добавляем левую вершину в соседи
         if (leftNodeExist) {
             NodeOfGraph* neededNode = &resultGraph->at(i - 1);
-            nodesNeighbors.push_back(*neededNode);
+            nodesNeighbors.push_back(neededNode->getID());
         }
 
         // Добавляем текущую вершину в соседи
-        nodesNeighbors.push_back(*node);
+        nodesNeighbors.push_back(node->getID());
 
         // Добавляем правую вершину в соседи
         if (rightNodeExist) {
             NodeOfGraph* neededNode = &resultGraph->at(i + 1);
-            nodesNeighbors.push_back(*neededNode);
+            nodesNeighbors.push_back(neededNode->getID());
         }
 
         // Добавляем нижнюю вершину в соседи
         if (downNodeExist) {
             NodeOfGraph* neededNode = &resultGraph->at(i + countOfColumns);
-            nodesNeighbors.push_back(*neededNode);
+            nodesNeighbors.push_back(neededNode->getID());
         }
 
         // Добавление боковых
         if (throughLink) {
             NodeOfGraph* throwingNode = &resultGraph->at(i + countOfColumns + 1);
-            nodesNeighbors.push_back(*throwingNode);
+            nodesNeighbors.push_back(throwingNode->getID());
 
-            vector<NodeOfGraph> throwingNodeNeighbors = throwingNode->getNeightbors();
-            throwingNodeNeighbors.push_back(*node);
+            vector<int> throwingNodeNeighbors = throwingNode->getNeightbors();
+            throwingNodeNeighbors.push_back(node->getID());
             throwingNode->setNeighbors(throwingNodeNeighbors);
             resultGraph->at(throwingNode->getID()) = *throwingNode;
 

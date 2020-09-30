@@ -9,7 +9,7 @@ private:
     //int value;
     int indexOfColumn;
     int indexOfRow;
-    std::vector<NodeOfGraph> neighbors;
+    std::vector<int> neighbors;
 
 public:
     void setIndexOfColumn(int value) { this->indexOfColumn = value; };
@@ -23,8 +23,8 @@ public:
     /*void setValue(int value) { this->value = value; };
     int getValue() { return this->value; };*/
 
-    void setNeighbors(std::vector<NodeOfGraph> value) { this->neighbors = value; };
-    std::vector<NodeOfGraph> getNeightbors() { return this->neighbors; };
+    void setNeighbors(std::vector<int> value) { this->neighbors = value; };
+    std::vector<int> getNeightbors() { return this->neighbors; };
 
     NodeOfGraph()
     {

@@ -44,6 +44,14 @@ public:
         //this->value = id;
     }
 
+    NodeOfGraph(int indexOfColumn, int indexOfRow, int id)
+    {
+        this->indexOfColumn = indexOfColumn;
+        this->indexOfRow = indexOfRow;
+        this->neighbors;
+        this->id = id;
+        //this->value = id;
+    }
 };
 
-void printResult(std::vector<NodeOfGraph> *graph, double seconds);
+void printResult(std::vector<NodeOfGraph>* graph, std::vector<int>* IA, std::vector<int>* JA, double seconds);

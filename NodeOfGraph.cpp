@@ -1,10 +1,10 @@
 #include "NodeOfGraph.h"
+#include <iostream>
 #include <sstream>
 #include <vector>
-#include <iostream>
 using namespace std;
 
-string createIA(vector<NodeOfGraph> *graph)
+/*string createIA(vector<NodeOfGraph> *graph)
 {
     string result = "[";
     int countOfLinks = 0;
@@ -41,13 +41,32 @@ string createJA(vector<NodeOfGraph> *graph)
     }
 
     return result + "]";
+}*/
+
+string vectorToString(vector<int>* intVector)
+{
+    stringstream result;
+    result << "[";
+
+    for (int i = 0; i < intVector->size(); i++) {
+
+        if (i == intVector->size() - 1) {
+            result << to_string(intVector->at(i));
+        } else {
+            result << to_string(intVector->at(i)) << ", ";
+        }
+    }
+
+    result << "]";
+
+    return result.str();
 }
 
-vector<string> createAdjacencyList(vector<NodeOfGraph> *graph)
+vector<string> createAdjacencyList(vector<NodeOfGraph>* graph)
 {
     vector<string> result;
 
-    for (NodeOfGraph &node : *graph) {
+    for (NodeOfGraph& node : *graph) {
         stringstream resultString;
         resultString << "[" << node.getID() << "] Ц> {";
 
@@ -69,15 +88,15 @@ vector<string> createAdjacencyList(vector<NodeOfGraph> *graph)
     return result;
 }
 
-void printResult(vector<NodeOfGraph> *graph, double seconds)
+void printResult(vector<NodeOfGraph>* graph, vector<int>* IA, vector<int>* JA, double seconds)
 {
     cout << "N (–азмер матрицы) Ц " << graph->size() << " вершин" << endl;
 
-    string IA = createIA(graph);
-    cout << "IA: " << IA << endl;
+    string IAstring = vectorToString(IA);
+    cout << "IA: " << IAstring << endl;
 
-    string JA = createJA(graph);
-    cout << "JA: " << JA << endl;
+    string JAstring = vectorToString(JA);
+    cout << "JA: " << JAstring << endl;
 
     vector<string> adjacencyList = createAdjacencyList(graph);
     cout << "—писок смежности: " << endl;

@@ -20,30 +20,17 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
 	int nodesToThroughLink = k1;
 	int connectNodes = k2;
 
-	#pragma omp parallel
-	{
-		#pragma omp for
-		for (int i = 0; i < countOfRows; i++)
-		{
-			for (int j = 0; j < countOfColumns; j++)
-			{
-				int nodeId = countOfColumns * i + j;
-				NodeOfGraph* node = &NodeOfGraph(j, i, nodeId);
-				resultGraph->at(nodeId) = *node;
-			}
-		}
-	}
-
+	vector<int> tempIA;
+	vector<vector<int>> tempJA;
 	int sizeOfResultGraph = resultGraph->size();
-	map<int, int> linkedNodes;
-	/*#pragma omp parallel shared(sizeOfResultGraph, countOfColumns, countOfRows, resultGraph, IA, JA)
-	{
-		#pragma omp for*/
+	tempIA.resize(sizeOfResultGraph);
+
+	vector<int> throughLinkNodesUp;
+	vector<int> throughLinkNodesDown;
 	for (int i = 0; i < sizeOfResultGraph; i++)
 	{
-		NodeOfGraph node = resultGraph->at(i);
-		int nodeIndexOfColumn = node.getIndexOfColumn();
-		int nodeIndexOfRow = node.getIndexOfRow();
+		int nodeIndexOfColumn = i % (countOfRows + 1);
+		int nodeIndexOfRow = i / (countOfRows + 1);
 
 		bool throughLink = false;
 
@@ -61,76 +48,10 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
 			throughLink = rightNodeExist && downNodeExist;
 		}
 
-		vector<int> nodesNeighbors = node.getNeightbors();
-		auto linkedId = linkedNodes.find(i);
-		if (linkedNodes.find(i) != linkedNodes.end())
-		{
-			//#pragma omp critical
-			//{
-			JA->push_back(linkedId->second);
-			linkedNodes.erase(i);
-		//}
-		}
-
-		// Добавляем верхнюю вершину в соседи
-		if (upNodeExist)
-		{
-			NodeOfGraph* neededNode = &resultGraph->at(i - countOfColumns);
-			int nedeedNodeId = neededNode->getID();
-			nodesNeighbors.push_back(nedeedNodeId);
-			JA->push_back(nedeedNodeId);
-		}
-
-		// Добавляем левую вершину в соседи
-		if (leftNodeExist)
-		{
-			NodeOfGraph* neededNode = &resultGraph->at(i - 1);
-			int nedeedNodeId = neededNode->getID();
-			nodesNeighbors.push_back(nedeedNodeId);
-			JA->push_back(nedeedNodeId);
-		}
-
-		// Добавляем текущую вершину в соседи
-		int nodeId = node.getID();
-		nodesNeighbors.push_back(node.getID());
-		JA->push_back(nodeId);
-
-		// Добавляем правую вершину в соседи
-		if (rightNodeExist)
-		{
-			NodeOfGraph* neededNode = &resultGraph->at(i + 1);
-			int nedeedNodeId = neededNode->getID();
-			nodesNeighbors.push_back(nedeedNodeId);
-			JA->push_back(nedeedNodeId);
-		}
-
-		// Добавляем нижнюю вершину в соседи
-		if (downNodeExist)
-		{
-			NodeOfGraph* neededNode = &resultGraph->at(i + countOfColumns);
-			int nedeedNodeId = neededNode->getID();
-			nodesNeighbors.push_back(nedeedNodeId);
-			JA->push_back(nedeedNodeId);
-		}
-
-		// Добавление боковых
 		if (throughLink)
 		{
-			NodeOfGraph* throwingNode = &resultGraph->at(i + countOfColumns + 1);
-			int throwingNodeId = throwingNode->getID();
-			nodesNeighbors.push_back(throwingNodeId);
-			JA->push_back(throwingNodeId);
-
-			//#pragma omp critical
-			//{
-			linkedNodes.insert(pair<int, int>(throwingNodeId, nodeId));
-		//}
-
-			vector<int> throwingNodeNeighbors = throwingNode->getNeightbors();
-			throwingNodeNeighbors.push_back(nodeId);
-			throwingNode->setNeighbors(throwingNodeNeighbors);
-			resultGraph->at(throwingNode->getID()) = *throwingNode;
-			IA->at(throwingNodeId + 1) = IA->at(throwingNodeId + 1) + 1;
+			throughLinkNodesUp.push_back(i);
+			throughLinkNodesDown.push_back(i);
 
 			// Сколько узлов еще надо соединить
 			connectNodes--;
@@ -140,13 +61,106 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
 				connectNodes = k2;
 			}
 		}
-
-		node.setNeighbors(nodesNeighbors);
-		resultGraph->at(i) = node;
-		int currentIA = IA->at(i) + nodesNeighbors.size();
-		IA->at(i + 1) = currentIA;
 	}
-//}
+
+	#pragma omp parallel
+	{
+		#pragma omp for
+		for (int i = 0; i < countOfRows; i++)
+		{
+			for (int j = 0; j < countOfColumns; j++)
+			{
+				// Создание узла
+				int nodeId = countOfColumns * i + j;
+				NodeOfGraph* node = &NodeOfGraph(j, i, nodeId);
+
+				// Обработка узлов
+				int nodeIndexOfColumn = node->getIndexOfColumn();
+				int nodeIndexOfRow = node->getIndexOfRow();
+
+				auto throughLinkNodesIdDown = find(throughLinkNodesDown.begin(), throughLinkNodesDown.end(), nodeId);
+				bool throughLinkDown = (throughLinkNodesIdDown != throughLinkNodesDown.end());
+				auto throughLinkNodesIdUp = find(throughLinkNodesUp.begin(), throughLinkNodesUp.end(), nodeId - countOfColumns - 1);
+				bool throughLinkUp = (throughLinkNodesIdUp != throughLinkNodesUp.end());
+
+				bool rightNodeExist = (nodeIndexOfColumn < countOfColumns - 1);
+				bool leftNodeExist = (nodeIndexOfColumn > 0);
+				bool downNodeExist = (nodeIndexOfRow < countOfRows - 1);
+				bool upNodeExist = (nodeIndexOfRow > 0);
+
+				vector<int> nodesNeighbors = node->getNeightbors();
+
+				// Добавление боковых сверху
+				if (throughLinkUp)
+				{
+					int throwingNodeId = nodeId - countOfColumns - 1;
+					nodesNeighbors.push_back(throwingNodeId);
+					/*#pragma omp critical
+					{
+						throughLinkNodesUp.erase(remove(throughLinkNodesUp.begin(), throughLinkNodesUp.end(), nodeId), throughLinkNodesUp.end());
+					}*/
+				}
+
+				// Добавляем верхнюю вершину в соседи
+				if (upNodeExist)
+				{
+					nodesNeighbors.push_back(nodeId - countOfColumns);
+				}
+
+				// Добавляем левую вершину в соседи
+				if (leftNodeExist)
+				{
+					nodesNeighbors.push_back(nodeId - 1);
+				}
+
+				// Добавляем текущую вершину в соседи
+				nodesNeighbors.push_back(nodeId);
+
+				// Добавляем правую вершину в соседи
+				if (rightNodeExist)
+				{
+					nodesNeighbors.push_back(nodeId + 1);
+				}
+
+				// Добавляем нижнюю вершину в соседи
+				if (downNodeExist)
+				{
+					nodesNeighbors.push_back(nodeId + countOfColumns);
+				}
+
+				// Добавление боковых снизу
+				if (throughLinkDown)
+				{
+					int throwingNodeId = nodeId + countOfColumns + 1;
+					nodesNeighbors.push_back(throwingNodeId);
+					/*#pragma omp critical
+					{
+						throughLinkNodesDown.erase(remove(throughLinkNodesDown.begin(), throughLinkNodesDown.end(), nodeId), throughLinkNodesDown.end());
+					}*/
+				}
+				//
+
+				node->setNeighbors(nodesNeighbors);
+				resultGraph->at(nodeId) = *node;
+
+				tempIA.at(nodeId) = nodesNeighbors.size();
+			}
+		}
+	}
+
+	// Заполнение портретов
+	for (int i = 0; i < sizeOfResultGraph; i++)
+	{
+		NodeOfGraph node = resultGraph->at(i);
+		vector<int> nodesNeighbors = node.getNeightbors();
+		IA->at(i + 1) = IA->at(i) + tempIA.at(i);
+
+		for (int element : nodesNeighbors)
+		{
+			JA->push_back(element);
+		}
+	}
+
 }
 
 void makeSLAE(vector<int>* IA, vector<int>* JA, vector<double>* A, vector<double>* b, int countOfNodes)
@@ -210,6 +224,48 @@ void printSLAE(vector<double>* A, vector<double>* b, vector<int>* IA)
 	}
 }
 
+void doTask(int T, int Nx, int Ny, int k1, int k2, vector<NodeOfGraph> resultGraph, vector<int> IA, vector<int> JA, int countOfNodes, int isPrint)
+{
+	cout << "Количество потоков: " << to_string(T) << endl << endl;
+
+	#pragma region Первый этап
+	omp_set_num_threads(T);
+	double start = omp_get_wtime();
+	createNodesOfGraph(Nx, Ny, k1, k2, &resultGraph, &IA, &JA);
+	double end = omp_get_wtime();
+	double seconds = end - start;
+	cout << "Всего элементов: " << countOfNodes << " шт." << endl;
+	cout << "Время первого этапа: " << seconds << " c." << endl;
+	cout << "Время первого этапа на 1 элемент: " << seconds / countOfNodes << " c." << endl
+		<< endl;
+	#pragma endregion
+
+	#pragma region Второй этап
+	// Вектор ненулевых коэффициентов матрицы
+	vector<double> A;
+	A.resize(JA.size());
+	// Вектор правой части
+	vector<double> b;
+	b.resize(countOfNodes);
+
+	double startSecondStage = omp_get_wtime();
+	makeSLAE(&IA, &JA, &A, &b, countOfNodes);
+	double endSecondStage = omp_get_wtime();
+	double endSecondStagePrint = endSecondStage - startSecondStage;
+	cout << "Время второго этапа: " << endSecondStagePrint << " c." << endl;
+	cout << "Время второго этапа на 1 элемент: " << endSecondStagePrint / countOfNodes << " c." << endl << endl;
+
+	if (isPrint)
+	{
+		printResult(&resultGraph, &IA, &JA, seconds);
+		printSLAE(&A, &b, &IA);
+	}
+
+	cout << "//////" << endl << endl;
+
+	#pragma endregion
+}
+
 int main(int argc, char* argv[])
 {
 
@@ -255,43 +311,10 @@ int main(int argc, char* argv[])
 	resultGraph.resize(countOfNodes);
 	IA.resize(countOfNodes);
 	IA.push_back(0);
-
-	omp_set_num_threads(T);
 	#pragma endregion
 
-	#pragma region Первый этап
-	double start = omp_get_wtime();
-	createNodesOfGraph(Nx, Ny, k1, k2, &resultGraph, &IA, &JA);
-	double end = omp_get_wtime();
-	double seconds = end - start;
-	cout << "Всего элементов: " << countOfNodes << " шт." << endl;
-	cout << "Время первого этапа: " << seconds << " c." << endl;
-	cout << "Время первого этапа на 1 элемент: " << seconds / countOfNodes << " c." << endl
-		<< endl;
-	#pragma endregion
-
-	#pragma region Второй этап
-		// Вектор ненулевых коэффициентов матрицы
-	vector<double> A;
-	A.resize(JA.size());
-	// Вектор правой части
-	vector<double> b;
-	b.resize(countOfNodes);
-
-	double startSecondStage = omp_get_wtime();
-	makeSLAE(&IA, &JA, &A, &b, countOfNodes);
-	double endSecondStage = omp_get_wtime();
-	double endSecondStagePrint = endSecondStage - startSecondStage;
-	cout << "Время второго этапа: " << endSecondStagePrint << " c." << endl;
-	cout << "Время второго этапа на 1 элемент: " << endSecondStagePrint / countOfNodes << " c." << endl << endl;
-
-	if (isPrint)
-	{
-		printResult(&resultGraph, &IA, &JA, seconds);
-		printSLAE(&A, &b, &IA);
-	}
-
-	#pragma endregion
+	doTask(1, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
+	doTask(T, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
 
 	return 0;
 }

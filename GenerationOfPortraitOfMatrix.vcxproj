@@ -141,10 +141,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="NodeOfGraph.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="NodeOfGraph.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

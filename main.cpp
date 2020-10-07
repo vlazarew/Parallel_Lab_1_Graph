@@ -1,5 +1,3 @@
-using namespace std;
-#include "NodeOfGraph.h"
 #include <cmath>
 #include <iomanip>
 #include <iostream>
@@ -9,7 +7,8 @@ using namespace std;
 #include <time.h>
 #include <vector>
 
-void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* resultGraph, vector<int>* IA, vector<int>* JA)
+#pragma region Этап 1. Генерация
+void createNodesOfGraphVector(int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int>> resultGraph, std::vector<int>* IA, std::vector<int>* JA, int sizeOfResultGraph)
 {
 	// Поскольку узлы
 	int countOfRows = Nx;
@@ -20,17 +19,16 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
 	int nodesToThroughLink = k1;
 	int connectNodes = k2;
 
-	vector<int> tempIA;
-	vector<vector<int>> tempJA;
-	int sizeOfResultGraph = resultGraph->size();
-	tempIA.resize(sizeOfResultGraph);
+	std::vector<int> throughLinkNodesUp;
+	std::vector<int> throughLinkNodesDown;
 
-	vector<int> throughLinkNodesUp;
-	vector<int> throughLinkNodesDown;
 	for (int i = 0; i < sizeOfResultGraph; i++)
 	{
 		int nodeIndexOfColumn = i % (countOfRows + 1);
 		int nodeIndexOfRow = i / (countOfRows + 1);
+
+		std::vector<int> nodesNeighbors;
+		resultGraph.insert(std::pair<int, std::vector<int>>(i, nodesNeighbors));
 
 		bool throughLink = false;
 
@@ -72,11 +70,11 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
 			{
 				// Создание узла
 				int nodeId = countOfColumns * i + j;
-				NodeOfGraph* node = &NodeOfGraph(j, i, nodeId);
+				std::vector<int> nodesNeighbors = resultGraph.at(nodeId);
 
 				// Обработка узлов
-				int nodeIndexOfColumn = node->getIndexOfColumn();
-				int nodeIndexOfRow = node->getIndexOfRow();
+				int nodeIndexOfColumn = j;
+				int nodeIndexOfRow = i;
 
 				auto throughLinkNodesIdDown = find(throughLinkNodesDown.begin(), throughLinkNodesDown.end(), nodeId);
 				bool throughLinkDown = (throughLinkNodesIdDown != throughLinkNodesDown.end());
@@ -88,17 +86,11 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
 				bool downNodeExist = (nodeIndexOfRow < countOfRows - 1);
 				bool upNodeExist = (nodeIndexOfRow > 0);
 
-				vector<int> nodesNeighbors = node->getNeightbors();
-
 				// Добавление боковых сверху
 				if (throughLinkUp)
 				{
 					int throwingNodeId = nodeId - countOfColumns - 1;
 					nodesNeighbors.push_back(throwingNodeId);
-					/*#pragma omp critical
-					{
-						throughLinkNodesUp.erase(remove(throughLinkNodesUp.begin(), throughLinkNodesUp.end(), nodeId), throughLinkNodesUp.end());
-					}*/
 				}
 
 				// Добавляем верхнюю вершину в соседи
@@ -133,17 +125,10 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
 				{
 					int throwingNodeId = nodeId + countOfColumns + 1;
 					nodesNeighbors.push_back(throwingNodeId);
-					/*#pragma omp critical
-					{
-						throughLinkNodesDown.erase(remove(throughLinkNodesDown.begin(), throughLinkNodesDown.end(), nodeId), throughLinkNodesDown.end());
-					}*/
 				}
 				//
 
-				node->setNeighbors(nodesNeighbors);
-				resultGraph->at(nodeId) = *node;
-
-				tempIA.at(nodeId) = nodesNeighbors.size();
+				resultGraph.at(nodeId) = nodesNeighbors;
 			}
 		}
 	}
@@ -151,9 +136,8 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
 	// Заполнение портретов
 	for (int i = 0; i < sizeOfResultGraph; i++)
 	{
-		NodeOfGraph node = resultGraph->at(i);
-		vector<int> nodesNeighbors = node.getNeightbors();
-		IA->at(i + 1) = IA->at(i) + tempIA.at(i);
+		std::vector<int> nodesNeighbors = resultGraph.at(i);
+		IA->at(i + 1) = IA->at(i) + nodesNeighbors.size();
 
 		for (int element : nodesNeighbors)
 		{
@@ -163,7 +147,85 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, vector<NodeOfGraph>* res
 
 }
 
-void makeSLAE(vector<int>* IA, vector<int>* JA, vector<double>* A, vector<double>* b, int countOfNodes)
+std::string vectorToString(std::vector<int>* intVector)
+{
+	std::stringstream result;
+	result << "[";
+
+	for (int i = 0; i < intVector->size(); i++)
+	{
+
+		if (i == intVector->size() - 1)
+		{
+			result << std::to_string(intVector->at(i));
+		}
+		else
+		{
+			result << std::to_string(intVector->at(i)) << ", ";
+		}
+	}
+
+	result << "]";
+
+	return result.str();
+}
+
+std::vector<std::string> createAdjacencyListVector(std::map<int, std::vector<int>> graph)
+{
+	std::vector<std::string> result;
+
+	for (std::pair<int, std::vector<int>> nodePair : graph)
+	{
+		std::stringstream resultString;
+		resultString << "[" << nodePair.first << "] –> {";
+
+		std::vector<int> neighbors = nodePair.second;
+		for (int i = 0; i < neighbors.size(); i++)
+		{
+			int neighborID = neighbors[i];
+
+			if (i == neighbors.size() - 1)
+			{
+				resultString << std::to_string(neighborID);
+			}
+			else
+			{
+				resultString << std::to_string(neighborID) << ", ";
+			}
+		}
+
+		resultString << "}";
+		result.push_back(resultString.str());
+	}
+
+	return result;
+}
+
+void printResultVector(std::map<int, std::vector<int>> graph, std::vector<int>* IA, std::vector<int>* JA, double seconds, int countOfNode)
+{
+	std::cout << "N (Размер матрицы) – " << countOfNode << " вершин" << std::endl;
+
+	std::string IAstring = vectorToString(IA);
+	std::cout << "IA: " << IAstring << std::endl;
+
+	std::string JAstring = vectorToString(JA);
+	std::cout << "JA: " << JAstring << std::endl;
+
+	std::vector<std::string> adjacencyList = createAdjacencyListVector(graph);
+	std::cout << "Список смежности: " << std::endl;
+	for (std::string adjancecyString : adjacencyList)
+	{
+		std::cout << adjancecyString << std::endl;
+	}
+
+	std::cout << "Время выполнения: " << seconds << " с." << std::endl;
+	std::cout << "Время на 1 узел: " << seconds / countOfNode << " с." << std::endl;
+}
+
+#pragma endregion
+
+#pragma region Этап 2. Построение СЛАУ
+void makeSLAE(std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* A, std::vector<double>* b, int countOfNodes)
 {
 	// i - номер строки, j - номер столбца
 	#pragma omp parallel
@@ -197,9 +259,9 @@ void makeSLAE(vector<int>* IA, vector<int>* JA, vector<double>* A, vector<double
 	}
 }
 
-void printSLAE(vector<double>* A, vector<double>* b, vector<int>* IA)
+void printSLAE(std::vector<double>* A, std::vector<double>* b, std::vector<int>* IA)
 {
-	cout << "Коэффициенты матрицы и правой части: " << endl;
+	std::cout << "Коэффициенты матрицы и правой части: " << std::endl;
 
 	int countOfLinks = 0;
 	int currentIndex = 0;
@@ -207,11 +269,11 @@ void printSLAE(vector<double>* A, vector<double>* b, vector<int>* IA)
 	{
 		countOfLinks = IA->at(i) - IA->at(i - 1);
 
-		stringstream resultString;
-		resultString << to_string(i - 1) << " -> [";
+		std::stringstream resultString;
+		resultString << std::to_string(i - 1) << " -> [";
 		for (int j = 0; j < countOfLinks; j++)
 		{
-			resultString << fixed << showpoint << setprecision(5) << A->at(currentIndex);
+			resultString << std::fixed << std::showpoint << std::setprecision(5) << A->at(currentIndex);
 			currentIndex++;
 			if (j != countOfLinks - 1)
 			{
@@ -220,48 +282,55 @@ void printSLAE(vector<double>* A, vector<double>* b, vector<int>* IA)
 		}
 
 		resultString << "]";
-		cout << resultString.str() << " = " << fixed << showpoint << setprecision(5) << b->at(i - 1) << endl;
+		std::cout << resultString.str() << " = " << std::fixed << std::showpoint << std::setprecision(5) << b->at(i - 1) << std::endl;
 	}
 }
 
-void doTask(int T, int Nx, int Ny, int k1, int k2, vector<NodeOfGraph> resultGraph, vector<int> IA, vector<int> JA, int countOfNodes, int isPrint)
+#pragma endregion
+
+#pragma region Этап 3. Решение СЛАУ
+
+#pragma endregion
+
+#pragma region Главные методы
+void doTaskVector(int T, int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int>> resultGraph, std::vector<int> IA, std::vector<int> JA, int countOfNodes, int isPrint)
 {
-	cout << "Количество потоков: " << to_string(T) << endl << endl;
+	std::cout << "Количество потоков: " << std::to_string(T) << std::endl << std::endl;
 
 	#pragma region Первый этап
 	omp_set_num_threads(T);
 	double start = omp_get_wtime();
-	createNodesOfGraph(Nx, Ny, k1, k2, &resultGraph, &IA, &JA);
+	createNodesOfGraphVector(Nx, Ny, k1, k2, resultGraph, &IA, &JA, countOfNodes);
 	double end = omp_get_wtime();
 	double seconds = end - start;
-	cout << "Всего элементов: " << countOfNodes << " шт." << endl;
-	cout << "Время первого этапа: " << seconds << " c." << endl;
-	cout << "Время первого этапа на 1 элемент: " << seconds / countOfNodes << " c." << endl
-		<< endl;
+	std::cout << "Всего элементов: " << countOfNodes << " шт." << std::endl;
+	std::cout << "Время первого этапа: " << seconds << " c." << std::endl;
+	std::cout << "Время первого этапа на 1 элемент: " << seconds / countOfNodes << " c." << std::endl
+		<< std::endl;
 	#pragma endregion
 
 	#pragma region Второй этап
 	// Вектор ненулевых коэффициентов матрицы
-	vector<double> A;
+	std::vector<double> A;
 	A.resize(JA.size());
 	// Вектор правой части
-	vector<double> b;
+	std::vector<double> b;
 	b.resize(countOfNodes);
 
 	double startSecondStage = omp_get_wtime();
 	makeSLAE(&IA, &JA, &A, &b, countOfNodes);
 	double endSecondStage = omp_get_wtime();
 	double endSecondStagePrint = endSecondStage - startSecondStage;
-	cout << "Время второго этапа: " << endSecondStagePrint << " c." << endl;
-	cout << "Время второго этапа на 1 элемент: " << endSecondStagePrint / countOfNodes << " c." << endl << endl;
+	std::cout << "Время второго этапа: " << endSecondStagePrint << " c." << std::endl;
+	std::cout << "Время второго этапа на 1 элемент: " << endSecondStagePrint / countOfNodes << " c." << std::endl << std::endl;
 
 	if (isPrint)
 	{
-		printResult(&resultGraph, &IA, &JA, seconds);
+		printResultVector(resultGraph, &IA, &JA, seconds, countOfNodes);
 		printSLAE(&A, &b, &IA);
 	}
 
-	cout << "//////" << endl << endl;
+	std::cout << "//////" << std::endl << std::endl;
 
 	#pragma endregion
 }
@@ -274,8 +343,8 @@ int main(int argc, char* argv[])
 
 	int Nx, Ny, k1, k2, T;
 	bool isPrint = false;
-	vector<int> arguments, IA, JA;
-	vector<NodeOfGraph> resultGraph;
+	std::vector<int> arguments, IA, JA;
+	std::map<int, std::vector<int>> resultGraph;
 
 	// Первый параметр - ссылка на сборку
 	for (int i = 1; i < argc; i++)
@@ -286,13 +355,13 @@ int main(int argc, char* argv[])
 		}
 		catch (const std::exception&)
 		{
-			cout << "Некорректный ввод параметров запуска" << endl;
+			std::cout << "Некорректный ввод параметров запуска" << std::endl;
 		}
 	}
 
 	if (arguments.empty() || arguments.size() < 4)
 	{
-		cout << "Введите 4 параметра портрета графа (Nx, Ny, k1, k2, T)!" << endl;
+		std::cout << "Введите 4 параметра портрета графа (Nx, Ny, k1, k2, T)!" << std::endl;
 		return 0;
 	}
 
@@ -308,13 +377,14 @@ int main(int argc, char* argv[])
 	}
 
 	int countOfNodes = Nx * Ny;
-	resultGraph.resize(countOfNodes);
 	IA.resize(countOfNodes);
 	IA.push_back(0);
 	#pragma endregion
 
-	doTask(1, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
-	doTask(T, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
+	doTaskVector(1, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
+	doTaskVector(T, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
 
 	return 0;
 }
+
+#pragma endregion

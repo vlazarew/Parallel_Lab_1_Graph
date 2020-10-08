@@ -8,7 +8,7 @@
 #include <vector>
 
 #pragma region Этап 1. Генерация
-void createNodesOfGraphVector(int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int>> resultGraph, std::vector<int>* IA, std::vector<int>* JA, int sizeOfResultGraph)
+void createNodesOfGraph(int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int>> resultGraph, std::vector<int>* IA, std::vector<int>* JA, int sizeOfResultGraph)
 {
 	// Поскольку узлы
 	int countOfRows = Nx;
@@ -170,7 +170,7 @@ std::string vectorToString(std::vector<int>* intVector)
 	return result.str();
 }
 
-std::vector<std::string> createAdjacencyListVector(std::map<int, std::vector<int>> graph)
+std::vector<std::string> createAdjacencyList(std::map<int, std::vector<int>> graph)
 {
 	std::vector<std::string> result;
 
@@ -201,7 +201,7 @@ std::vector<std::string> createAdjacencyListVector(std::map<int, std::vector<int
 	return result;
 }
 
-void printResultVector(std::map<int, std::vector<int>> graph, std::vector<int>* IA, std::vector<int>* JA, double seconds, int countOfNode)
+void printResult(std::map<int, std::vector<int>> graph, std::vector<int>* IA, std::vector<int>* JA, double seconds, int countOfNode)
 {
 	std::cout << "N (Размер матрицы) – " << countOfNode << " вершин" << std::endl;
 
@@ -211,7 +211,7 @@ void printResultVector(std::map<int, std::vector<int>> graph, std::vector<int>* 
 	std::string JAstring = vectorToString(JA);
 	std::cout << "JA: " << JAstring << std::endl;
 
-	std::vector<std::string> adjacencyList = createAdjacencyListVector(graph);
+	std::vector<std::string> adjacencyList = createAdjacencyList(graph);
 	std::cout << "Список смежности: " << std::endl;
 	for (std::string adjancecyString : adjacencyList)
 	{
@@ -289,18 +289,21 @@ void printSLAE(std::vector<double>* A, std::vector<double>* b, std::vector<int>*
 #pragma endregion
 
 #pragma region Этап 3. Решение СЛАУ
+void solveSLAE(std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* A, std::vector<double>* b, int Nx, double tol, std::vector<double>* x, int n, double res)
+{
 
+}
 #pragma endregion
 
 #pragma region Главные методы
-void doTaskVector(int T, int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int>> resultGraph, std::vector<int> IA, std::vector<int> JA, int countOfNodes, int isPrint)
+void doTask(int T, int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int>> resultGraph, std::vector<int> IA, std::vector<int> JA, int countOfNodes, int isPrint, double tol)
 {
 	std::cout << "Количество потоков: " << std::to_string(T) << std::endl << std::endl;
 
 	#pragma region Первый этап
 	omp_set_num_threads(T);
 	double start = omp_get_wtime();
-	createNodesOfGraphVector(Nx, Ny, k1, k2, resultGraph, &IA, &JA, countOfNodes);
+	createNodesOfGraph(Nx, Ny, k1, k2, resultGraph, &IA, &JA, countOfNodes);
 	double end = omp_get_wtime();
 	double seconds = end - start;
 	std::cout << "Всего элементов: " << countOfNodes << " шт." << std::endl;
@@ -324,9 +327,21 @@ void doTaskVector(int T, int Nx, int Ny, int k1, int k2, std::map<int, std::vect
 	std::cout << "Время второго этапа: " << endSecondStagePrint << " c." << std::endl;
 	std::cout << "Время второго этапа на 1 элемент: " << endSecondStagePrint / countOfNodes << " c." << std::endl << std::endl;
 
+	#pragma region Третий этап
+	// Вектор решений
+	std::vector<double> x;
+	x.resize(Nx);
+	// Количество итераций
+	int n;
+	// L2 норма невзяки
+	double res;
+
+	solveSLAE(&IA, &JA, &A, &b, Nx, tol, &x, n, res);
+	#pragma endregion
+
 	if (isPrint)
 	{
-		printResultVector(resultGraph, &IA, &JA, seconds, countOfNodes);
+		printResult(resultGraph, &IA, &JA, seconds, countOfNodes);
 		printSLAE(&A, &b, &IA);
 	}
 
@@ -381,8 +396,8 @@ int main(int argc, char* argv[])
 	IA.push_back(0);
 	#pragma endregion
 
-	doTaskVector(1, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
-	doTaskVector(T, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
+	doTask(1, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
+	doTask(T, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
 
 	return 0;
 }

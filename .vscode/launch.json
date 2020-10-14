@@ -4,11 +4,12 @@
     // Для получения дополнительной информации посетите: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "(Windows) Запустить",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "Введите имя программы, например: ${workspaceFolder}/a.exe",
+            "program": "${workspaceFolder}/build.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

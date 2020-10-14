@@ -6,6 +6,7 @@
 #include <sstream>
 #include <time.h>
 #include <vector>
+#include <string>
 
 #pragma region Этап 1. Генерация
 void createNodesOfGraph(int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int>> resultGraph, std::vector<int>* IA, std::vector<int>* JA, int sizeOfResultGraph)
@@ -24,8 +25,8 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, std::map<int, std::vecto
 
 	for (int i = 0; i < sizeOfResultGraph; i++)
 	{
-		int nodeIndexOfColumn = i % (countOfRows + 1);
-		int nodeIndexOfRow = i / (countOfRows + 1);
+		int nodeIndexOfColumn = i % (countOfRows);
+		int nodeIndexOfRow = i / (countOfRows);
 
 		std::vector<int> nodesNeighbors;
 		resultGraph.insert(std::pair<int, std::vector<int>>(i, nodesNeighbors));
@@ -144,7 +145,6 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, std::map<int, std::vecto
 			JA->push_back(element);
 		}
 	}
-
 }
 
 std::string vectorToString(std::vector<int>* intVector)
@@ -227,7 +227,7 @@ void printResult(std::map<int, std::vector<int>> graph, std::vector<int>* IA, st
 #pragma region Этап 2. Построение СЛАУ
 void makeSLAE(std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* A, std::vector<double>* b, int countOfNodes)
 {
-	// i - номер строки, j - номер столбца
+// i - номер строки, j - номер столбца
 	#pragma omp parallel
 	{
 		#pragma omp for
@@ -289,16 +289,245 @@ void printSLAE(std::vector<double>* A, std::vector<double>* b, std::vector<int>*
 #pragma endregion
 
 #pragma region Этап 3. Решение СЛАУ
-void solveSLAE(std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* A, std::vector<double>* b, int Nx, double tol, std::vector<double>* x, int n, double res)
-{
 
+double scalar(std::vector<double>* x1, std::vector<double>* x2)
+{
+	double result = 0;
+	int vectorSize = x1->size();
+
+	#pragma omp parallel
+	{
+		#pragma omp for
+		for (int i = 0; i < vectorSize; i++)
+		{
+			result += x1->at(i) * x2->at(i);
+		}
+	}
+
+	return result;
 }
+
+double normalizeVector(std::vector<double>* x)
+{
+	double result = 0;
+
+	#pragma omp parallel
+	{
+		#pragma omp for
+		for (int i = 0; i < x->size(); i++)
+		{
+			result += x->at(i) * x->at(i);
+		}
+	}
+
+	return std::sqrt(result);
+}
+
+std::vector<double> spMV(int countOfNodes, std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* A, std::vector<double>* x)
+{
+	std::vector<double> result;
+	result.resize(countOfNodes);
+	if (x->size() == 0)
+	{
+		x->resize(countOfNodes);
+	}
+
+	#pragma omp parallel
+	{
+		#pragma omp for
+		for (int i = 0; i < countOfNodes; i++)
+		{
+			for (int k = IA->at(i); k < IA->at(i + 1); k++)
+			{
+				result.at(i) += A->at(k) * x->at(JA->at(k));
+			}
+		}
+	}
+
+	return result;
+}
+
+std::vector<double> linearCombination(std::vector<double>* x1, std::vector<double>* x2, double a1, double a2)
+{
+	std::vector<double> result;
+	int vectorSize = x1->size();
+	result.resize(vectorSize);
+
+
+	#pragma omp parallel
+	{
+		#pragma omp for
+		for (int i = 0; i < vectorSize; i++)
+		{
+			result.at(i) = x1->at(i) * a1 + x2->at(i) * a2;
+		}
+	}
+
+	return result;
+}
+
+void createMMatrixFromA(int countOfNodes, std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* A, std::vector<int>* IAM, std::vector<int>* JAM, std::vector<double>* AM)
+{
+	IAM->resize(countOfNodes + 1);
+	AM->resize(countOfNodes);
+	JAM->resize(countOfNodes);
+	IAM->at(0) = 0;
+
+	#pragma omp parallel
+	{
+		#pragma omp for
+		for (int i = 0; i < countOfNodes; i++)
+		{
+			int startIndex = IA->at(i);
+			int endIndex = IA->at(i + 1);
+
+			for (int j = startIndex; j < endIndex; ++j)
+			{
+				int indexOfNode = JA->at(j);
+				if (i == indexOfNode)
+				{
+					AM->at(i) = A->at(j);
+					IAM->at(i + 1) = i + 1;
+					JAM->at(i) = i;
+				}
+			}
+		}
+	}
+}
+
+void reverseMMatrix(std::vector<double>* AM)
+{
+	#pragma omp parallel
+	{
+		#pragma omp for
+		for (int i = 0; i < AM->size(); i++)
+		{
+			AM->at(i) = 1 / AM->at(i);
+		}
+	}
+}
+
+void solveSLAE(std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* A, std::vector<double>* b, int countOfNodes, double tol, std::vector<std::vector<double>>* x, std::vector<std::vector<double>>* r, int n, double res, std::vector<double>* xRes)
+{
+	double normB = normalizeVector(b);
+
+	std::vector<std::vector<double>> z;
+	std::vector<std::vector<double>> p;
+	std::vector<std::vector<double>> q;
+	std::vector<double> po;
+	std::vector<double> betta;
+	std::vector<double> alpha;
+	// Чтоб был заполнен нулевой элемент
+	z.push_back(std::vector<double> {0});
+	p.push_back(std::vector<double> {0});
+	q.push_back(std::vector<double> {0});
+	po.push_back(0);
+	betta.push_back(0);
+	alpha.push_back(0);
+
+	std::vector<double> AX0 = spMV(countOfNodes, IA, JA, A, &x->at(0));
+	r->at(0) = linearCombination(b, &AX0, 1, -1);
+
+	bool convergence = false;
+	int k = 1;
+	std::vector<int> IAM;
+	std::vector<int> JAM;
+	std::vector<double> AM;
+	createMMatrixFromA(countOfNodes, IA, JA, A, &IAM, &JAM, &AM);
+	reverseMMatrix(&AM);
+
+	do
+	{
+		// Блок проверок
+		if (k + 1 > z.size())
+		{
+			z.resize(k + 1);
+		}
+		if (k + 1 > p.size())
+		{
+			p.resize(k + 1);
+		}
+		if (k + 1 > q.size())
+		{
+			q.resize(k + 1);
+		}
+		if (k + 1 > po.size())
+		{
+			po.resize(k + 1);
+		}
+		if (k + 1 > betta.size())
+		{
+			betta.resize(k + 1);
+		}
+		if (k + 1 > alpha.size())
+		{
+			alpha.resize(k + 1);
+		}
+		//
+
+		/*createMMatrixFromA(countOfNodes, IA, JA, A, &IAM, &JAM, &AM);
+		reverseMMatrix(&AM);*/
+		z.at(k) = spMV(countOfNodes, &IAM, &JAM, &AM, &r->at(k - 1));
+		po.at(k) = scalar(&r->at(k - 1), &z.at(k));
+
+		if (k == 1)
+		{
+			p.at(k) = z.at(k);
+		}
+		else
+		{
+			betta.at(k) = po.at(k) / po.at(k - 1);
+			p.at(k) = linearCombination(&z.at(k), &p.at(k - 1), 1, b->at(k));
+		}
+
+		q.at(k) = spMV(countOfNodes, IA, JA, A, &p.at(k));
+		alpha.at(k) = po.at(k) / scalar(&p.at(k), &q.at(k));
+		x->at(k) = linearCombination(&x->at(k - 1), &p.at(k), 1, alpha.at(k));
+		r->at(k) = linearCombination(&r->at(k - 1), &q.at(k), 1, -alpha.at(k));
+
+		std::cout << "Итерация " << k << " ||b - Ax|| = " << normalizeVector(&r->at(k)) << " po = " << po.at(k) << std::endl;
+		if (po.at(k) < tol || k >= 15000)
+		{
+			convergence = true;
+		}
+		else
+		{
+			k++;
+		}
+	}
+	while (!convergence);
+
+	res = normalizeVector(&r->at(k));
+	n = k;
+	xRes = &x->at(k);
+}
+
+void printSolveVector(double res, int n, std::vector<double>* x)
+{
+	std::cout << "x = [";
+	for (int i = 0; i < x->size(); i++)
+	{
+		if (i == x->size() - 1)
+		{
+			std::cout << std::fixed << std::showpoint << std::setprecision(5) << x->at(i) << " ]" << std::endl;
+		}
+		else
+		{
+			std::cout << std::fixed << std::showpoint << std::setprecision(5) << x->at(i) << ", ";
+		}
+	}
+
+	std::cout << "Норма невязки = " << res << std::endl;
+	std::cout << "Количество итераций = " << n << std::endl;
+}
+
 #pragma endregion
 
 #pragma region Главные методы
 void doTask(int T, int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int>> resultGraph, std::vector<int> IA, std::vector<int> JA, int countOfNodes, int isPrint, double tol)
 {
-	std::cout << "Количество потоков: " << std::to_string(T) << std::endl << std::endl;
+	std::cout << "Количество потоков: " << std::to_string(T) << std::endl
+		<< std::endl;
 
 	#pragma region Первый этап
 	omp_set_num_threads(T);
@@ -313,7 +542,7 @@ void doTask(int T, int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int
 	#pragma endregion
 
 	#pragma region Второй этап
-	// Вектор ненулевых коэффициентов матрицы
+		// Вектор ненулевых коэффициентов матрицы
 	std::vector<double> A;
 	A.resize(JA.size());
 	// Вектор правой части
@@ -325,27 +554,40 @@ void doTask(int T, int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int
 	double endSecondStage = omp_get_wtime();
 	double endSecondStagePrint = endSecondStage - startSecondStage;
 	std::cout << "Время второго этапа: " << endSecondStagePrint << " c." << std::endl;
-	std::cout << "Время второго этапа на 1 элемент: " << endSecondStagePrint / countOfNodes << " c." << std::endl << std::endl;
+	std::cout << "Время второго этапа на 1 элемент: " << endSecondStagePrint / countOfNodes << " c." << std::endl
+		<< std::endl;
 
 	#pragma region Третий этап
-	// Вектор решений
-	std::vector<double> x;
-	x.resize(Nx);
+	// Вектор векторов решений
+	std::vector<std::vector<double>> x;
+	std::vector<double> xRes;
+	// Вектор с невязкой
+	std::vector<std::vector<double>> r;
+	x.resize(countOfNodes);
+	r.resize(countOfNodes);
 	// Количество итераций
-	int n;
+	int n = 0;
 	// L2 норма невзяки
-	double res;
+	double res = 0;
 
-	solveSLAE(&IA, &JA, &A, &b, Nx, tol, &x, n, res);
+	double startThirdStage = omp_get_wtime();
+	solveSLAE(&IA, &JA, &A, &b, countOfNodes, tol, &x, &r, n, res, &xRes);
+	double endThirdStage = omp_get_wtime();
+	double endThirdStagePrint = endThirdStage - startThirdStage;
+	std::cout << "Время третьего этапа: " << endThirdStagePrint << " c." << std::endl;
+	std::cout << "Время третьго этапа на 1 элемент: " << endThirdStagePrint / countOfNodes << " c." << std::endl
+		<< std::endl;
 	#pragma endregion
 
 	if (isPrint)
 	{
 		printResult(resultGraph, &IA, &JA, seconds, countOfNodes);
 		printSLAE(&A, &b, &IA);
+		printSolveVector(res, n, &xRes);
 	}
 
-	std::cout << "//////" << std::endl << std::endl;
+	std::cout << "//////" << std::endl
+		<< std::endl;
 
 	#pragma endregion
 }
@@ -357,6 +599,8 @@ int main(int argc, char* argv[])
 	setlocale(LC_ALL, "Russian");
 
 	int Nx, Ny, k1, k2, T;
+	// Точность решения
+	double tol;
 	bool isPrint = false;
 	std::vector<int> arguments, IA, JA;
 	std::map<int, std::vector<int>> resultGraph;
@@ -366,7 +610,14 @@ int main(int argc, char* argv[])
 	{
 		try
 		{
-			arguments.push_back(atoi(argv[i]));
+			if (i == 6)
+			{
+				tol = std::stod(argv[i]);
+			}
+			else
+			{
+				arguments.push_back(atoi(argv[i]));
+			}
 		}
 		catch (const std::exception&)
 		{
@@ -374,9 +625,9 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	if (arguments.empty() || arguments.size() < 4)
+	if (arguments.empty() || arguments.size() < 5)
 	{
-		std::cout << "Введите 4 параметра портрета графа (Nx, Ny, k1, k2, T)!" << std::endl;
+		std::cout << "Введите 6 параметра портрета графа (Nx, Ny, k1, k2, T, tol, isPrint)!" << std::endl;
 		return 0;
 	}
 
@@ -396,8 +647,8 @@ int main(int argc, char* argv[])
 	IA.push_back(0);
 	#pragma endregion
 
-	doTask(1, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
-	doTask(T, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint);
+		//doTask(1, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint, tol);
+	doTask(T, Nx, Ny, k1, k2, resultGraph, IA, JA, countOfNodes, isPrint, tol);
 
 	return 0;
 }

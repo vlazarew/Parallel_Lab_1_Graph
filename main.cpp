@@ -290,8 +290,10 @@ void printSLAE(std::vector<double>* A, std::vector<double>* b, std::vector<int>*
 
 #pragma region Этап 3. Решение СЛАУ
 
-double scalar(std::vector<double>* x1, std::vector<double>* x2)
+double scalar(std::vector<double>* x1, std::vector<double>* x2, double& allTime, int& countOfCalls)
 {
+	double start = omp_get_wtime();
+
 	double result = 0;
 	int vectorSize = x1->size();
 
@@ -303,6 +305,10 @@ double scalar(std::vector<double>* x1, std::vector<double>* x2)
 			result += x1->at(i) * x2->at(i);
 		}
 	}
+
+	double end = omp_get_wtime();
+	allTime += (end - start);
+	countOfCalls++;
 
 	return result;
 }
@@ -323,8 +329,10 @@ double normalizeVector(std::vector<double>* x)
 	return std::sqrt(result);
 }
 
-std::vector<double> spMV(int countOfNodes, std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* A, std::vector<double>* x)
+std::vector<double> spMV(int countOfNodes, std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* A, std::vector<double>* x, double& allTime, int& countOfCalls)
 {
+	double start = omp_get_wtime();
+
 	std::vector<double> result;
 	result.resize(countOfNodes);
 	if (x->size() == 0)
@@ -344,11 +352,17 @@ std::vector<double> spMV(int countOfNodes, std::vector<int>* IA, std::vector<int
 		}
 	}
 
+	double end = omp_get_wtime();
+	allTime += (end - start);
+	countOfCalls++;
+
 	return result;
 }
 
-std::vector<double> linearCombination(std::vector<double>* x1, std::vector<double>* x2, double a1, double a2)
+std::vector<double> linearCombination(std::vector<double>* x1, std::vector<double>* x2, double a1, double a2, double& allTime, int& countOfCalls)
 {
+	double start = omp_get_wtime();
+
 	std::vector<double> result;
 	int vectorSize = x1->size();
 	result.resize(vectorSize);
@@ -362,6 +376,10 @@ std::vector<double> linearCombination(std::vector<double>* x1, std::vector<doubl
 			result.at(i) = x1->at(i) * a1 + x2->at(i) * a2;
 		}
 	}
+
+	double end = omp_get_wtime();
+	allTime += (end - start);
+	countOfCalls++;
 
 	return result;
 }
@@ -409,6 +427,14 @@ void reverseMMatrix(std::vector<double>* AM)
 
 void solveSLAE(std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* A, std::vector<double>* b, int countOfNodes, double tol, std::vector<std::vector<double>>* x, std::vector<std::vector<double>>* r, int n, double res, std::vector<double>* xRes)
 {
+	double allTimeSpMV = 0;
+	double allTimeLinear = 0;
+	double allTimeScalar = 0;
+
+	int countOfCallsSpMV = 0;
+	int countOfCallsLinear = 0;
+	int countOfCallsScalar = 0;
+
 	double normB = normalizeVector(b);
 
 	std::vector<std::vector<double>> z;
@@ -425,8 +451,8 @@ void solveSLAE(std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* 
 	betta.push_back(0);
 	alpha.push_back(0);
 
-	std::vector<double> AX0 = spMV(countOfNodes, IA, JA, A, &x->at(0));
-	r->at(0) = linearCombination(b, &AX0, 1, -1);
+	std::vector<double> AX0 = spMV(countOfNodes, IA, JA, A, &x->at(0), allTimeSpMV, countOfCallsSpMV);
+	r->at(0) = linearCombination(b, &AX0, 1, -1, allTimeLinear, countOfCallsLinear);
 
 	bool convergence = false;
 	int k = 1;
@@ -467,8 +493,8 @@ void solveSLAE(std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* 
 
 		/*createMMatrixFromA(countOfNodes, IA, JA, A, &IAM, &JAM, &AM);
 		reverseMMatrix(&AM);*/
-		z.at(k) = spMV(countOfNodes, &IAM, &JAM, &AM, &r->at(k - 1));
-		po.at(k) = scalar(&r->at(k - 1), &z.at(k));
+		z.at(k) = spMV(countOfNodes, &IAM, &JAM, &AM, &r->at(k - 1), allTimeSpMV, countOfCallsSpMV);
+		po.at(k) = scalar(&r->at(k - 1), &z.at(k), allTimeScalar, countOfCallsScalar);
 
 		if (k == 1)
 		{
@@ -477,13 +503,13 @@ void solveSLAE(std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* 
 		else
 		{
 			betta.at(k) = po.at(k) / po.at(k - 1);
-			p.at(k) = linearCombination(&z.at(k), &p.at(k - 1), 1, b->at(k));
+			p.at(k) = linearCombination(&z.at(k), &p.at(k - 1), 1, b->at(k), allTimeLinear, countOfCallsLinear);
 		}
 
-		q.at(k) = spMV(countOfNodes, IA, JA, A, &p.at(k));
-		alpha.at(k) = po.at(k) / scalar(&p.at(k), &q.at(k));
-		x->at(k) = linearCombination(&x->at(k - 1), &p.at(k), 1, alpha.at(k));
-		r->at(k) = linearCombination(&r->at(k - 1), &q.at(k), 1, -alpha.at(k));
+		q.at(k) = spMV(countOfNodes, IA, JA, A, &p.at(k), allTimeSpMV, countOfCallsSpMV);
+		alpha.at(k) = po.at(k) / scalar(&p.at(k), &q.at(k), allTimeScalar, countOfCallsScalar);
+		x->at(k) = linearCombination(&x->at(k - 1), &p.at(k), 1, alpha.at(k), allTimeLinear, countOfCallsLinear);
+		r->at(k) = linearCombination(&r->at(k - 1), &q.at(k), 1, -alpha.at(k), allTimeLinear, countOfCallsLinear);
 
 		std::cout << "Итерация " << k << " ||b - Ax|| = " << normalizeVector(&r->at(k)) << " po = " << po.at(k) << std::endl;
 		if (po.at(k) < tol || k >= 15000)
@@ -496,6 +522,10 @@ void solveSLAE(std::vector<int>* IA, std::vector<int>* JA, std::vector<double>* 
 		}
 	}
 	while (!convergence);
+
+	std::cout << "Среднее время SpMV: " << (allTimeSpMV / countOfCallsSpMV) << " c." << std::endl;
+	std::cout << "Среднее время scalar: " << (allTimeScalar / countOfCallsScalar) << " c." << std::endl;
+	std::cout << "Среднее время linear: " << (allTimeLinear / countOfCallsLinear) << " c." << std::endl;
 
 	res = normalizeVector(&r->at(k));
 	n = k;

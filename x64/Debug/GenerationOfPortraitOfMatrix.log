@@ -1,9 +1,0 @@
-﻿  main.cpp
-D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\Parallel_Lab_1_Graph\main.cpp(141,52): warning C4267: =: преобразование из "size_t" в "_Ty"; возможна потеря данных
-          with
-          [
-              _Ty=int
-          ]
-D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\Parallel_Lab_1_Graph\main.cpp(298,29): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
-D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\Parallel_Lab_1_Graph\main.cpp(367,29): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
-  GenerationOfPortraitOfMatrix.vcxproj -> D:\Универ\МГУ\5 курс\Параллельные вычисления\Лаба 1. Граф\Parallel_Lab_1_Graph\x64\Debug\GenerationOfPortraitOfMatrix.exe

@@ -315,6 +315,7 @@ double scalar(std::vector<double> &x1, std::vector<double> &x2, double &allTime,
 	return result;
 }
 
+// Расчет L2 нормы вектора
 double normalizeVector(std::vector<double> &x)
 {
 	double result = 0;
@@ -427,8 +428,8 @@ void reverseMMatrix(std::vector<double> &AM)
 	}
 }
 
-void solveSLAE(std::vector<int> &IA, std::vector<int> &JA, std::vector<double> &A, std::vector<double> &b, int countOfNodes, double tol, std::vector<std::vector<double>> &x,
-			   std::vector<std::vector<double>> &r, int &n, double &res, std::vector<double> &xRes)
+void solveSLAE(std::vector<int> &IA, std::vector<int> &JA, std::vector<double> &A, std::vector<double> &b, int countOfNodes, double tol, std::vector<double> &xRes,
+			   int &n, double &res)
 {
 	double allTimeSpMV = 0;
 	double allTimeLinear = 0;
@@ -440,22 +441,24 @@ void solveSLAE(std::vector<int> &IA, std::vector<int> &JA, std::vector<double> &
 
 	double normB = normalizeVector(b);
 
-	std::vector<std::vector<double>> z;
-	std::vector<std::vector<double>> p;
-	std::vector<std::vector<double>> q;
-	std::vector<double> po;
-	std::vector<double> betta;
-	std::vector<double> alpha;
-	// Чтобы был заполнен нулевой элемент
-	z.push_back(std::vector<double>{0});
-	p.push_back(std::vector<double>{0});
-	q.push_back(std::vector<double>{0});
-	po.push_back(0);
-	betta.push_back(0);
-	alpha.push_back(0);
+	std::vector<double> zCurr;
+	std::vector<double> pPrev;
+	std::vector<double> pCurr;
+	std::vector<double> qCurr;
+	double poPrev;
+	double poCurr;
+	double bettaCurr;
+	double alphaCurr;
 
-	std::vector<double> AX0 = spMV(countOfNodes, IA, JA, A, x.at(0), allTimeSpMV, countOfCallsSpMV);
-	r.at(0) = linearCombination(b, AX0, 1, -1, allTimeLinear, countOfCallsLinear);
+	std::vector<double> xPrev;
+	// Вектор с невязкой
+	std::vector<double> rPrev;
+	std::vector<double> rCurr;
+	xPrev.resize(countOfNodes);
+	rPrev.resize(countOfNodes);
+
+	std::vector<double> AX0 = spMV(countOfNodes, IA, JA, A, xPrev, allTimeSpMV, countOfCallsSpMV);
+	rPrev = linearCombination(b, AX0, 1, -1, allTimeLinear, countOfCallsLinear);
 
 	bool convergence = false;
 	int k = 1;
@@ -467,74 +470,49 @@ void solveSLAE(std::vector<int> &IA, std::vector<int> &JA, std::vector<double> &
 
 	do
 	{
-		// Блок проверок
-		if (k + 1 > z.size())
-		{
-			z.resize(k + 1);
-		}
-		if (k + 1 > p.size())
-		{
-			p.resize(k + 1);
-		}
-		if (k + 1 > q.size())
-		{
-			q.resize(k + 1);
-		}
-		if (k + 1 > po.size())
-		{
-			po.resize(k + 1);
-		}
-		if (k + 1 > betta.size())
-		{
-			betta.resize(k + 1);
-		}
-		if (k + 1 > alpha.size())
-		{
-			alpha.resize(k + 1);
-		}
-		//
-
-		/*createMMatrixFromA(countOfNodes, IA, JA, A, IAM, JAM, AM);
-		reverseMMatrix(AM);*/
-		z.at(k) = spMV(countOfNodes, IAM, JAM, AM, r.at(k - 1), allTimeSpMV, countOfCallsSpMV);
-		po.at(k) = scalar(r.at(k - 1), z.at(k), allTimeScalar, countOfCallsScalar);
+		zCurr = spMV(countOfNodes, IAM, JAM, AM, rPrev, allTimeSpMV, countOfCallsSpMV);
+		poCurr = scalar(rPrev, zCurr, allTimeScalar, countOfCallsScalar);
 
 		if (k == 1)
 		{
-			p.at(k) = z.at(k);
+			pCurr = zCurr;
 		}
 		else
 		{
-			betta.at(k) = po.at(k) / po.at(k - 1);
-			p.at(k) = linearCombination(z.at(k), p.at(k - 1), 1, b.at(k), allTimeLinear, countOfCallsLinear);
+			bettaCurr = poCurr / poPrev;
+			pCurr = linearCombination(zCurr, pPrev, 1, b.at(k), allTimeLinear, countOfCallsLinear);
 		}
 
-		q.at(k) = spMV(countOfNodes, IA, JA, A, p.at(k), allTimeSpMV, countOfCallsSpMV);
-		alpha.at(k) = po.at(k) / scalar(p.at(k), q.at(k), allTimeScalar, countOfCallsScalar);
-		x.at(k) = linearCombination(x.at(k - 1), p.at(k), 1, alpha.at(k), allTimeLinear, countOfCallsLinear);
-		r.at(k) = linearCombination(r.at(k - 1), q.at(k), 1, -alpha.at(k), allTimeLinear, countOfCallsLinear);
+		qCurr = spMV(countOfNodes, IA, JA, A, pCurr, allTimeSpMV, countOfCallsSpMV);
+		alphaCurr = poCurr / scalar(pCurr, qCurr, allTimeScalar, countOfCallsScalar);
+		xRes = linearCombination(xPrev, pCurr, 1, alphaCurr, allTimeLinear, countOfCallsLinear);
+		rCurr = linearCombination(rPrev, qCurr, 1, -alphaCurr, allTimeLinear, countOfCallsLinear);
 
-		std::cout << "Step (Итерация) " << k << " ||b - Ax|| = " << normalizeVector(r.at(k)) << " po = " << po.at(k) << std::endl;
-		if (po.at(k) < tol || k >= 15000)
+		res = normalizeVector(rCurr);
+
+		std::cout << "Step (Итерация) " << k << " ||b - Ax|| = " << res << " po = " << poCurr << std::endl;
+		if (poCurr < tol || k >= 15000)
 		{
 			convergence = true;
 		}
 		else
 		{
 			k++;
+			poPrev = poCurr;
+			pPrev = pCurr;
+			xPrev = xRes;
+			rPrev = rCurr;
 		}
 	} while (!convergence);
 
-	/*std::cout << "Average time (Среднее время) SpMV: " << (allTimeSpMV / countOfCallsSpMV) << " s." << std::endl;
-	std::cout << "Average time (Среднее время) scalar: " << (allTimeScalar / countOfCallsScalar) << " s." << std::endl;
-	std::cout << "Average time (Среднее время) linear: " << (allTimeLinear / countOfCallsLinear) << " s." << std::endl;*/
-	std::cout << "Total time (Общее время) SpMV: " << (allTimeSpMV) << " s." << std::endl;
+	/*std::cout << "Average time (Среднее время) scalar: " << (allTimeScalar / countOfCallsScalar) << " s." << std::endl;
+	std::cout << "Average time (Среднее время) linear: " << (allTimeLinear / countOfCallsLinear) << " s." << std::endl;
+	std::cout << "Average time (Среднее время) SpMV: " << (allTimeSpMV / countOfCallsSpMV) << " s." << std::endl;	*/
 	std::cout << "Total time (Общее время) scalar: " << (allTimeScalar) << " s." << std::endl;
 	std::cout << "Total time (Общее время) linear: " << (allTimeLinear) << " s." << std::endl;
+	std::cout << "Total time (Общее время) SpMV: " << (allTimeSpMV) << " s." << std::endl;
 
-	res = normalizeVector(r.at(k));
-	n = k;
-	xRes = x.at(k);
+	n = k;	
 }
 
 void printSolveVector(double res, int n, std::vector<double> &x)
@@ -592,22 +570,18 @@ void doTask(int T, int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int
 	std::cout << "Second stage time (Время второго этапа): " << endSecondStagePrint << " s." << std::endl;
 	std::cout << "Second stage time per 1 elem (Время второго этапа на 1 элемент): " << endSecondStagePrint / countOfNodes << " s." << std::endl
 			  << std::endl;
+#pragma endregion
 
 #pragma region Третий этап
-	// Вектор векторов решений
-	std::vector<std::vector<double>> x;
+	// Вектор решения
 	std::vector<double> xRes;
-	// Вектор с невязкой
-	std::vector<std::vector<double>> r;
-	x.resize(countOfNodes);
-	r.resize(countOfNodes);
 	// Количество итераций
 	int n = 0;
 	// L2 норма невязки
 	double res = 0;
 
 	double startThirdStage = omp_get_wtime();
-	solveSLAE(IA, JA, A, b, countOfNodes, tol, x, r, n, res, xRes);
+	solveSLAE(IA, JA, A, b, countOfNodes, tol, xRes, n, res);
 	double endThirdStage = omp_get_wtime();
 	double endThirdStagePrint = endThirdStage - startThirdStage;
 	std::cout << "Third stage time (Время третьего этапа): " << endThirdStagePrint << " s." << std::endl;
@@ -624,8 +598,6 @@ void doTask(int T, int Nx, int Ny, int k1, int k2, std::map<int, std::vector<int
 
 	std::cout << "//////" << std::endl
 			  << std::endl;
-
-#pragma endregion
 }
 
 int main(int argc, char *argv[])

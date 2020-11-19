@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <numeric>
 #include <math.h>
 
 #pragma region Этап 1. Генерация
@@ -22,13 +23,16 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, std::map<int, std::vecto
 	int nodesToThroughLink = k1;
 	int connectNodes = k2;
 
-	std::vector<int> throughLinkNodesUp;
-	std::vector<int> throughLinkNodesDown;
+	std::vector<bool> throughLinkNodesUp;
+	std::vector<bool> throughLinkNodesDown;
+
+	throughLinkNodesUp.resize(sizeOfResultGraph);
+	throughLinkNodesDown.resize(sizeOfResultGraph);
 
 	for (int i = 0; i < sizeOfResultGraph; i++)
 	{
-		int nodeIndexOfColumn = i % (countOfRows);
-		int nodeIndexOfRow = i / (countOfRows);
+		int nodeIndexOfColumn = i % (countOfColumns);
+		int nodeIndexOfRow = i / (countOfColumns);
 
 		std::vector<int> nodesNeighbors;
 		resultGraph.insert(std::pair<int, std::vector<int>>(i, nodesNeighbors));
@@ -51,8 +55,8 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, std::map<int, std::vecto
 
 		if (throughLink)
 		{
-			throughLinkNodesUp.push_back(i);
-			throughLinkNodesDown.push_back(i);
+			throughLinkNodesUp.at(i) = true;
+			throughLinkNodesDown.at(i) = true;
 
 			// Сколько узлов еще надо соединить
 			connectNodes--;
@@ -79,10 +83,9 @@ void createNodesOfGraph(int Nx, int Ny, int k1, int k2, std::map<int, std::vecto
 				int nodeIndexOfColumn = j;
 				int nodeIndexOfRow = i;
 
-				auto throughLinkNodesIdDown = find(throughLinkNodesDown.begin(), throughLinkNodesDown.end(), nodeId);
-				bool throughLinkDown = (throughLinkNodesIdDown != throughLinkNodesDown.end());
-				auto throughLinkNodesIdUp = find(throughLinkNodesUp.begin(), throughLinkNodesUp.end(), nodeId - countOfColumns - 1);
-				bool throughLinkUp = (throughLinkNodesIdUp != throughLinkNodesUp.end());
+				bool upExist = (nodeId - countOfColumns - 1) >= 0;
+				bool throughLinkDown = throughLinkNodesDown.at(nodeId);
+				bool throughLinkUp = upExist && throughLinkNodesDown.at(nodeId - countOfColumns - 1);
 
 				bool rightNodeExist = (nodeIndexOfColumn < countOfColumns - 1);
 				bool leftNodeExist = (nodeIndexOfColumn > 0);
@@ -179,7 +182,7 @@ std::vector<std::string> createAdjacencyList(std::map<int, std::vector<int>> &gr
 	for (std::pair<int, std::vector<int>> nodePair : graph)
 	{
 		std::stringstream resultString;
-		resultString << "[" << nodePair.first << "] �> {";
+		resultString << "[" << nodePair.first << "] -> {";
 
 		std::vector<int> neighbors = nodePair.second;
 		for (int i = 0; i < neighbors.size(); i++)
@@ -297,15 +300,24 @@ double scalar(std::vector<double> &x1, std::vector<double> &x2, double &allTime,
 	double start = omp_get_wtime();
 
 	double result = 0;
+	double result2 = 0;
+	std::vector<double> resultVector;
 	int vectorSize = x1.size();
+	resultVector.resize(vectorSize);
 
 #pragma omp parallel
 	{
 #pragma omp for
 		for (int i = 0; i < vectorSize; i++)
 		{
-			result += x1.at(i) * x2.at(i);
+			resultVector.at(i) = x1.at(i) * x2.at(i);
 		}
+	}
+
+	// result = accumulate(resultVector.begin(), resultVector.end(), 0);
+	for (int i = 0; i < vectorSize; i++)
+	{
+		result += resultVector.at(i);
 	}
 
 	double end = omp_get_wtime();
@@ -505,14 +517,14 @@ void solveSLAE(std::vector<int> &IA, std::vector<int> &JA, std::vector<double> &
 		}
 	} while (!convergence);
 
-	/*std::cout << "Average time (Среднее время) scalar: " << (allTimeScalar / countOfCallsScalar) << " s." << std::endl;
+	std::cout << "Average time (Среднее время) scalar: " << (allTimeScalar / countOfCallsScalar) << " s." << std::endl;
 	std::cout << "Average time (Среднее время) linear: " << (allTimeLinear / countOfCallsLinear) << " s." << std::endl;
-	std::cout << "Average time (Среднее время) SpMV: " << (allTimeSpMV / countOfCallsSpMV) << " s." << std::endl;	*/
+	std::cout << "Average time (Среднее время) SpMV: " << (allTimeSpMV / countOfCallsSpMV) << " s." << std::endl;
 	std::cout << "Total time (Общее время) scalar: " << (allTimeScalar) << " s." << std::endl;
 	std::cout << "Total time (Общее время) linear: " << (allTimeLinear) << " s." << std::endl;
 	std::cout << "Total time (Общее время) SpMV: " << (allTimeSpMV) << " s." << std::endl;
 
-	n = k;	
+	n = k;
 }
 
 void printSolveVector(double res, int n, std::vector<double> &x)

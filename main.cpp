@@ -255,7 +255,7 @@ void makeSLAE(std::vector<int> &IA, std::vector<int> &JA, std::vector<double> &A
 				{
 					double value = cos(i * indexOfNode + i + indexOfNode);
 					A.at(j) = value;
-					rowSum = rowSum + abs(value);
+					rowSum = rowSum + std::fabs(value);
 				}
 			}
 			A.at(diagonalIndex) = 1.234 * rowSum;
